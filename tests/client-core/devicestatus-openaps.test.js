@@ -373,6 +373,78 @@ describe('client-core: devicestatus / openaps (selectOpenAPSState)', function ()
     });
   });
 
+  describe('unenactedSmbSince', function () {
+
+    var NOW = Date.parse('2026-05-09T00:00:00Z');
+
+    function suggestedAt (minutesAgo, fields) {
+      var ts = moment(NOW).subtract(minutesAgo, 'minutes').toISOString();
+      return {
+        mills: Date.parse(ts)
+        , device: 'openaps://test'
+        , openaps: { suggested: Object.assign({ timestamp: ts, bg: 180 }, fields) }
+      };
+    }
+
+    function enactedAt (minutesAgo) {
+      var ts = moment(NOW).subtract(minutesAgo, 'minutes').toISOString();
+      return {
+        mills: Date.parse(ts)
+        , device: 'openaps://test'
+        , openaps: { enacted: { timestamp: ts, received: true, rate: 1.5, duration: 30 } }
+      };
+    }
+
+    function since (statuses) {
+      var r = selectOpenAPSState(statuses, moment(NOW).subtract(15, 'minutes'));
+      return r.unenactedSmbSince && r.unenactedSmbSince.valueOf();
+    }
+
+    it('starts at the first SMB request after the last enacted record', function () {
+      // newest first, as the sandbox delivers devicestatus
+      since([
+        suggestedAt(5, { units: 0.4, rate: 1.5, duration: 30 })
+        , suggestedAt(30, { rate: 1.5, duration: 30 })
+        , suggestedAt(60, { units: 0.4, rate: 1.5, duration: 30 })
+        , suggestedAt(90, { units: 0.4 })
+        , enactedAt(100)
+        , suggestedAt(120, { units: 0.4 })
+      ]).should.equal(NOW - 90 * 60000);
+    });
+
+    it('is null when the SMB request was enacted afterwards', function () {
+      (since([
+        enactedAt(5)
+        , suggestedAt(10, { units: 0.4 })
+      ]) === null).should.be.true();
+    });
+
+    it('resets when the loop stops asking for insulin', function () {
+      since([
+        suggestedAt(5, { units: 0.3 })
+        , suggestedAt(20, { reason: 'temp 1.5 >~ req 1.5U/hr, no temp required' })
+        , suggestedAt(60, { units: 0.4 })
+      ]).should.equal(NOW - 5 * 60000);
+    });
+
+    it('ignores temp basal only requests (they are often skipped as already running)', function () {
+      (since([
+        suggestedAt(5, { rate: 0, duration: 120 })
+        , suggestedAt(60, { rate: 0, duration: 120 })
+      ]) === null).should.be.true();
+    });
+
+    it('does not count an enacted record that was not received as enacted', function () {
+      var notReceived = enactedAt(30);
+      notReceived.openaps.enacted.received = false;
+      since([
+        suggestedAt(5, { units: 0.4 })
+        , notReceived
+        , suggestedAt(60, { units: 0.4 })
+      ]).should.equal(NOW - 60 * 60000);
+    });
+  });
+
   describe('deviceName injection', function () {
     it('uses the supplied deviceName helper when provided', function () {
       var ts = moment().subtract(2, 'minutes').toISOString();

@@ -399,6 +399,67 @@ describe('openaps', function ( ) {
     done();
   });
 
+  describe('SMB not enacted alert', function () {
+    var smbNow = top_ctx.moment('2026-10-26T04:00:00.000Z');
+
+    // the loop asks for an SMB every 5 minutes, nothing gets enacted
+    function smbRequests (minutes) {
+      var list = [];
+      for (var ago = 0; ago <= minutes; ago += 5) {
+        var ts = smbNow.clone().subtract(ago, 'minutes');
+        list.push({
+          device: 'openaps://AndroidAPS'
+          , mills: ts.valueOf()
+          , openaps: { suggested: { timestamp: ts.toISOString(), bg: 200, eventualBG: 220, units: 0.4, rate: 1.5, duration: 30 } }
+        });
+      }
+      return list;
+    }
+
+    function notifyFor (devicestatus, extendedSettings, treatments) {
+      var ctx = {
+        settings: {
+          units: 'mg/dl'
+        }
+        , notifications: require('../lib/notifications')(env, top_ctx)
+        , language: language
+      };
+      ctx.notifications.initRequests();
+
+      var sbx = sandbox.clientInit(ctx, smbNow.valueOf(), { devicestatus: devicestatus, treatments: treatments || [] });
+      sbx.extendedSettings = Object.assign({ 'enableAlerts': 'TRUE' }, extendedSettings);
+      openaps.setProperties(sbx);
+      openaps.checkNotifications(sbx);
+      return ctx.notifications.findHighestAlarm('OpenAPS');
+    }
+
+    it('warns when SMBs are requested for 45 minutes without anything enacted', function () {
+      var highest = notifyFor(smbRequests(45));
+      highest.level.should.equal(levels.WARN);
+      highest.title.should.equal('OpenAPS SMB not enacted');
+    });
+
+    it('raises an urgent alarm after an hour', function () {
+      var highest = notifyFor(smbRequests(90));
+      highest.level.should.equal(levels.URGENT);
+      highest.title.should.equal('OpenAPS SMB not enacted');
+    });
+
+    it('stays quiet for a short gap', function () {
+      should.not.exist(notifyFor(smbRequests(30)));
+    });
+
+    it('can be turned off with OPENAPS_SMB_WARN=0 and OPENAPS_SMB_URGENT=0', function () {
+      should.not.exist(notifyFor(smbRequests(90), { smbWarn: 0, smbUrgent: 0 }));
+    });
+
+    it('stays quiet while an OpenAPS Offline event is active', function () {
+      should.not.exist(notifyFor(smbRequests(90), {}, [{
+        eventType: 'OpenAPS Offline', mills: smbNow.clone().subtract(100, 'minutes').valueOf(), duration: 180
+      }]));
+    });
+  });
+
   it('should handle virtAsst requests', function (done) {
     var ctx = {
       settings: {

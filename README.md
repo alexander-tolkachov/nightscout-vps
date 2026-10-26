@@ -649,6 +649,8 @@ Fetch glucose reading directly from the Dexcom Share service, uses these extende
   * `OPENAPS_ENABLE_ALERTS` (`false`) - Set to `true` to enable notifications when OpenAPS isn't looping.  If OpenAPS is going to offline for a period of time, you can add an `OpenAPS Offline` event for the expected duration from Careportal to avoid getting alerts.
   * `OPENAPS_WARN` (`30`) - The number of minutes since the last loop that needs to be exceed before an alert is triggered
   * `OPENAPS_URGENT` (`60`) - The number of minutes since the last loop that needs to be exceed before an urgent alarm is triggered
+  * `OPENAPS_SMB_WARN` (`40`) - The number of minutes the loop keeps requesting SMBs with nothing enacted before an alert is triggered. This catches a loop that runs but whose commands don't reach the pump (the pump status still updates, so the "isn't looping" alert stays quiet). Temp basal only requests are not counted, because the loop often skips them when an equivalent temp is already running. Set to `0` to disable
+  * `OPENAPS_SMB_URGENT` (`60`) - The same as `OPENAPS_SMB_WARN`, for the urgent alarm. Set to `0` to disable
   * `OPENAPS_FIELDS` (`status-symbol status-label iob meal-assist rssi`) - The fields to display by default.  Any of the following fields: `status-symbol`, `status-label`, `iob`, `meal-assist`, `freq`, and `rssi`
   * `OPENAPS_RETRO_FIELDS` (`status-symbol status-label iob meal-assist rssi`) - The fields to display in retro mode. Any of the above fields.
   * `OPENAPS_PRED_IOB_COLOR` (`#1e88e5`) - The color to use for IOB prediction lines. Colors can be in `#RRGGBB` format, but [other CSS color units](https://www.w3.org/TR/css-color-3/#colorunits) may be used as well.
