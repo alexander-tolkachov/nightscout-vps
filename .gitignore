@@ -43,3 +43,6 @@ letsencrypt/
 stats.json
 .replit
 attached_assets/
+
+.private/
+CLAUDE.md
